@@ -1,10 +1,7 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
-
 import Foundation
 
 /// Represents the scheduling mode for a task.
-public enum TaskScheduleMode {
+public enum TaskScheduleMode: Sendable {
     /// Execute the task immediately.
     case immediate
     /// Execute the task after a specified delay.

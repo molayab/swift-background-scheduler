@@ -1,10 +1,16 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
-
 import Foundation
 
+public protocol TaskSchedulerInterface {
+    func schedule(
+        task: ExecutableTask,
+        mode: TaskScheduleMode
+    ) async throws
+    
+    func runNext() async throws
+}
+
 @globalActor
-public actor TaskScheduler {
+public actor TaskScheduler: TaskSchedulerInterface {
     public typealias DelayedTask = (ExecutableTask, executeAt: Date)
     public typealias PeriodicTask = (
         ExecutableTask,
@@ -19,9 +25,9 @@ public actor TaskScheduler {
     private var periodicTasks: [PeriodicTask] = []
     
     /// Runs the next scheduled task based on its mode.
-    public func runNext() async {
+    public func runNext() async throws {
         // Execute immediate tasks first
-        await execute()
+        try await execute()
         
         // Schedule delayed tasks if their time has come
         scheduleDelayedTasks()
@@ -56,14 +62,10 @@ public actor TaskScheduler {
     // MARK: - Private Methods
     
     /// Executes the next task in the execution queue.
-    private func execute() async {
+    private func execute() async throws {
         guard !executionQueue.isEmpty else { return }
         let task = executionQueue.removeFirst()
-        do {
-            try await task.execute()
-        } catch {
-            print("Task execution failed with error: \(error)")
-        }
+        try await task.execute()
     }
     
     /// Schedules delayed tasks that are due for execution.

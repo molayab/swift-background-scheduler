@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "90CFB10A-5D97-4B63-AF6F-0769819E4F49",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "TaskSchedulerTests",
+        "name" : "TaskSchedulerTests"
+      }
+    }
+  ],
+  "version" : 1
+}

@@ -1,85 +1,38 @@
 import Foundation
 
+/// Represents the runtime state of a task executor.
 public enum TaskExecutorState: Sendable {
     case idle
     case running
     case paused
 }
 
-enum SharedResourceError: Swift.Error {
-    case notFound
-}
-
-public final class TaskExecutorSignal: Sendable {
-    public static func timerTrigger(
-        every timeInterval: TimeInterval,
-        repeats: Bool = true
-    ) -> TaskExecutorSignal {
-        let signal = TaskExecutorSignal()
-        Timer.scheduledTimer(
-            withTimeInterval: timeInterval,
-            repeats: repeats,
-            block: { timer in
-                signal.trigger()
-            })
-        return signal
-    }
-
-    private let _stream: AsyncStream<Void>
-    private let continuation: AsyncStream<Void>.Continuation
-
-    public init() {
-        var continuation: AsyncStream<Void>.Continuation!
-        self._stream = AsyncStream<Void> { continuation = $0 }
-        self.continuation = continuation
-    }
-
-    public func stream() -> AsyncStream<Void> {
-        _stream
-    }
-
-    public func trigger() {
-        continuation.yield(())
-    }
-}
-
-internal actor SharedResource<Resource: Sendable> {
-    private var resource: Resource?
-
-    init(resource: Resource? = nil) {
-        self.resource = resource
-    }
-
-    func access<T>(_ block: (inout Resource?) -> T) -> T {
-        block(&resource)
-    }
+/// A test-friendly interface for driving task execution.
+@available(macOS 10.15, *)
+public protocol TaskExecutorInterface: Sendable {
+    /// Executes the next scheduled task, if any.
+    func justNext() async throws
     
-    func override(_ newResource: Resource) {
-        resource = newResource
-    }
+    /// Starts a background loop that reacts to signals and runs tasks.
+    func runContinuously() -> Task<Void, Never>
     
-    func clear() {
-        resource = nil
-    }
+    /// Sets the executor to running and returns the background task.
+    @discardableResult
+    func resume() async -> Task<Void, Never>
     
-    func read(
-        defaultValue: Resource? = nil
-    ) throws(SharedResourceError) -> Resource {
-        if let resource {
-            return resource
-        } else if let defaultValue {
-            return defaultValue
-        } else {
-            throw .notFound
-        }
-    }
+    /// Resumes execution and awaits the background task.
+    func resumeAndWait() async
+    
+    /// Pauses execution.
+    func pause() async
 }
 
 /// Executes scheduled tasks using a provided TaskScheduler.
 ///
 /// This class provides methods to execute tasks either one at a time or continuously in the background.
 /// It allows for flexible task execution based on external triggers or ongoing processing needs.
-public final class TaskExecutor: Sendable {
+@available(macOS 10.15, *)
+public final class TaskExecutor: Sendable, TaskExecutorInterface {
     private let taskScheduler: TaskScheduler
     private let state = SharedResource<TaskExecutorState>(resource: .idle)
     private let taskSignal: TaskExecutorSignal
@@ -96,8 +49,8 @@ public final class TaskExecutor: Sendable {
     ///
     /// This method is useful to run task based on external triggers, like user actions or system events.
     /// It will execute one task from the scheduler's queue.
-    public func justNext() async {
-        await taskScheduler.runNext()
+    public func justNext() async throws {
+        try await taskScheduler.runNext()
     }
     
     /// Continuously runs scheduled tasks in the background.
@@ -112,7 +65,11 @@ public final class TaskExecutor: Sendable {
             do {
                 for await _ in taskSignal.stream() {
                     if try await executorState.read() != .running { break }
-                    await scheduler.runNext()
+                    do {
+                        try await scheduler.runNext()
+                    } catch {
+                        print("Error executing task: \(error). Continuing execution.")
+                    }
                 }
             } catch SharedResourceError.notFound {
                 print("TaskExecutor state not found. Stopping execution.")
@@ -123,17 +80,23 @@ public final class TaskExecutor: Sendable {
         return task
     }
     
+    /// Resumes task execution.
+    ///
+    /// This method sets the executor's state to running and starts continuous task execution.
+    /// - Returns: A Task that represents the continuous execution of tasks.
     @discardableResult
     public func resume() async -> Task<Void, Never> {
         await state.override(.running)
         return runContinuously()
     }
     
+    /// Resumes task execution and waits for it to complete.
     public func resumeAndWait() async {
         let task = await resume()
         await task.value
     }
     
+    /// Pauses task execution.
     public func pause() async {
         await state.override(.paused)
     }

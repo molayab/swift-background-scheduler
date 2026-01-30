@@ -1,8 +1,8 @@
 import TaskScheduler
 import Foundation
 
-@main
-struct MyApp {
+@available(macOS 10.15, *)
+@main struct MyApp {
     static func main() async {
         let scheduler = TaskScheduler.shared
         let taskSignal = TaskExecutorSignal.timerTrigger(every: 1) // Check every second
