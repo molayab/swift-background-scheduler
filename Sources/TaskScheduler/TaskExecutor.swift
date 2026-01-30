@@ -10,12 +10,12 @@ enum SharedResourceError: Swift.Error {
     case notFound
 }
 
-public final class TaskSignal: Sendable {
+public final class TaskExecutorSignal: Sendable {
     public static func timerTrigger(
         every timeInterval: TimeInterval,
         repeats: Bool = true
-    ) -> TaskSignal {
-        let signal = TaskSignal()
+    ) -> TaskExecutorSignal {
+        let signal = TaskExecutorSignal()
         Timer.scheduledTimer(
             withTimeInterval: timeInterval,
             repeats: repeats,
@@ -82,11 +82,11 @@ internal actor SharedResource<Resource: Sendable> {
 public final class TaskExecutor: Sendable {
     private let taskScheduler: TaskScheduler
     private let state = SharedResource<TaskExecutorState>(resource: .idle)
-    private let taskSignal: TaskSignal
+    private let taskSignal: TaskExecutorSignal
     
     public init(
         taskScheduler: TaskScheduler,
-        taskSignal: TaskSignal
+        taskSignal: TaskExecutorSignal
     ) {
         self.taskScheduler = taskScheduler
         self.taskSignal = taskSignal

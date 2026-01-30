@@ -5,7 +5,6 @@ import PackageDescription
 
 let package = Package(
     name: "TaskScheduler",
-    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(
             name: "TaskScheduler",

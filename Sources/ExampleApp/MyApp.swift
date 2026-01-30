@@ -5,7 +5,7 @@ import Foundation
 struct MyApp {
     static func main() async {
         let scheduler = TaskScheduler.shared
-        let taskSignal = TaskSignal.timerTrigger(every: 1) // Check every second
+        let taskSignal = TaskExecutorSignal.timerTrigger(every: 1) // Check every second
         
         let executor = TaskExecutor(
             taskScheduler: scheduler,
