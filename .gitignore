@@ -1,0 +1,52 @@
+## Build artifacts
+.build/
+DerivedData/
+
+## Swift Package Manager
+.swiftpm/
+Package.resolved
+
+## Xcode
+# Xcode temporary files
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.xcstategraph
+!default.xcstategraph
+*.xcbowserstate
+!default.xcbowserstate
+*.xcschememanagement
+!default.xcschememanagement
+*.xccademodel
+!default.xccademodel
+
+# Generated files
+*.gcno
+
+# Xcode user-specific files
+profile
+*.moved-aside
+xcuserdata/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Optional files to ignore
+.DS_Store 
+# Common macOS file, often included in a global gitignore
+# Generated screenshots from tests
+# *.png
+
+# Swift Package Manager dependencies source code
+# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+# SourcePackages/
+
+# Carthage dependencies
+# Add this line if you want to avoid checking in source code from Carthage dependencies.
+# Carthage/Checkouts/
+# Carthage/Build/
