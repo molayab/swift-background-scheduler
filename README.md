@@ -87,19 +87,63 @@ let executor = TaskExecutor(taskScheduler: .shared, taskSignal: signal)
 Task { await executor.resume() }
 ```
 
-#### Executing One Task Manually
+#### System-Driven Backends
 
-If you want to execute a single task on demand, call `justNext()`:
+`TaskExecutorSignal.systemDrivenTrigger(executor:)` connects the executor to platform backends and also provides a safe fallback timer trigger.
+
+Use case: run work when the system grants background time.
 
 ```swift
-await executor.justNext()
+let scheduler = TaskScheduler.shared
+let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: .manualTrigger())
+
+Task { await executor.resume() }
+
+let signal = TaskExecutorSignal.systemDrivenTrigger(executor: executor)
 ```
 
-#### Power-efficient system triggering updates
+**Built-in backends**
 
-On iOS, you can integrate with BackgroundTasks to trigger task execution when the system allows it. macOS provides similar capabilities with a tigger based on system events, the system will call the trigger once conditions are met, and the next scheduled tasks will be executed in that window.
+- iOS/tvOS/watchOS: `iOSBackend` uses system background scheduling (BackgroundModes) to trigger work.
+- macOS: `MacOSBackend` registers for macOS power-efficient background events.
+- Other platforms: falls back to `executor.runContinuously()`.
 
-You can use the `TaskExecutorSignal.systemDrivenTrigger()` to create a signal that integrates with these system events.
+#### Custom Backend
+
+You can plug in your own backend by conforming to `Backend` and registering your executor. Use this when you have an app-specific trigger (push, sockets, file events, etc.).
+
+Example backend that triggers when you call `notify()`:
+
+```swift
+final class ManualBackend: Backend {
+    private var executor: TaskExecutorInterface?
+
+    func register(_ executor: TaskExecutorInterface) {
+        self.executor = executor
+    }
+
+    func notify() {
+        Task { _ = await executor?.runNext() }
+    }
+}
+
+let scheduler = TaskScheduler.shared
+let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: .manualTrigger())
+Task { await executor.resume() }
+
+let backend = ManualBackend()
+
+// Register the backend with the executor
+TaskExecutorSignal.customDrivenTrigger(
+    usingBackend: backend,
+    withExecutor: executor // executor is directly called by your backend.
+)
+
+await scheduler.schedule(task: PrintTask(message: "Custom backend"), mode: .immediate)
+
+// Call your backend to perform next task
+backend.notify()
+```
 
 ### Example App
 
@@ -112,3 +156,4 @@ Contributions are welcome! Please open issues or pull requests on the GitHub rep
 #### Thanks
 
 Thanks to the Swift community for inspiration and ideas on concurrency and task scheduling.
+
