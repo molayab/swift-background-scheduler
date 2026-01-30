@@ -35,7 +35,7 @@ public actor TaskScheduler {
     /// - Parameters:
     ///   - task: The task to be scheduled.
     ///   - mode: The scheduling mode for the task.
-    func schedule(
+    public func schedule(
         task: ExecutableTask,
         mode: TaskScheduleMode
     ) async {
