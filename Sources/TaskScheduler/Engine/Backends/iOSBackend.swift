@@ -36,6 +36,10 @@ final class iOSBackend: Backend {
             }
         }
     }
+    
+    func unregister() {
+        BGTaskScheduler.shared.cancelAllTaskRequests()
+    }
 }
 
 #endif
