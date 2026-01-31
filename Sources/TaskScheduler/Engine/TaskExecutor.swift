@@ -8,8 +8,10 @@ public enum TaskExecutorState: Sendable {
 }
 
 /// A test-friendly interface for driving task execution.
-@available(macOS 10.15, *)
 public protocol TaskExecutorInterface: Sendable {
+    /// The task scheduler used by the executor.
+    var taskScheduler: TaskScheduler { get }
+    
     /// Executes the next scheduled task, if any.
     func justNext() async throws
     
@@ -31,15 +33,14 @@ public protocol TaskExecutorInterface: Sendable {
 ///
 /// This class provides methods to execute tasks either one at a time or continuously in the background.
 /// It allows for flexible task execution based on external triggers or ongoing processing needs.
-@available(macOS 10.15, *)
 public final class TaskExecutor: Sendable, TaskExecutorInterface {
-    private let taskScheduler: TaskScheduler
+    public let taskScheduler: TaskScheduler
     private let state = SharedResource<TaskExecutorState>(resource: .idle)
-    private let taskSignal: TaskExecutorSignal
+    private let taskSignal: TaskExecutorSignal?
     
     public init(
         taskScheduler: TaskScheduler,
-        taskSignal: TaskExecutorSignal
+        taskSignal: TaskExecutorSignal? = nil
     ) {
         self.taskScheduler = taskScheduler
         self.taskSignal = taskSignal
@@ -63,6 +64,7 @@ public final class TaskExecutor: Sendable, TaskExecutorInterface {
         
         let task = Task(priority: .background) {
             do {
+                guard let taskSignal else { return }
                 for await _ in taskSignal.stream() {
                     if try await executorState.read() != .running { break }
                     do {

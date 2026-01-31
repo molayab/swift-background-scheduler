@@ -5,24 +5,21 @@ import PackageDescription
 
 let package = Package(
     name: "TaskScheduler",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v10_15)
+    ],
     products: [
         .library(
             name: "TaskScheduler",
             targets: ["TaskScheduler"]
         ),
-        .executable(
-            name: "ExampleApp",
-            targets: ["ExampleApp"])
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "TaskScheduler"
-        ),
-        .executableTarget(
-            name: "ExampleApp",
-            dependencies: ["TaskScheduler"]
         ),
         .testTarget(
             name: "TaskSchedulerTests",

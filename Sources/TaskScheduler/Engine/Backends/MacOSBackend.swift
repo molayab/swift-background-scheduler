@@ -9,7 +9,6 @@
 
 import AppKit
 
-@available(macOS 10.15, *)
 final class MacOSBackend: Backend {
     private let nativeScheduler = NSBackgroundActivityScheduler(
         identifier: "com.example.myapp.backgroundactivity"

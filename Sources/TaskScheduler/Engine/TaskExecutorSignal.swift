@@ -1,7 +1,6 @@
 import Foundation
 
 /// A lightweight signal used by a task executor to wake up and run work.
-@available(macOS 10.15, *)
 public protocol TaskExecutorSignalInterface: Sendable {
     /// Returns the stream of trigger events consumed by the executor.
     func stream() -> AsyncStream<Void>
@@ -9,7 +8,6 @@ public protocol TaskExecutorSignalInterface: Sendable {
     func trigger()
 }
 
-@available(macOS 10.15, *)
 public final class TaskExecutorSignal: Sendable {
     /// Creates a signal that fires on a timer.
     /// - Parameters:

@@ -6,7 +6,6 @@ public enum SharedResourceError: Swift.Error {
     case notFound
 }
 
-
 /// A simple actor-backed container for safely sharing a mutable value across tasks.
 ///
 /// Use this to serialize access to a resource that needs to be read or replaced from multiple tasks.
