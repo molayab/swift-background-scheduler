@@ -1,24 +1,43 @@
-## TaskScheduler
+# TaskScheduler
 
-A lightweight, actor-based and protocol-oriented task scheduler built in pure Swift, ready for all platforms. Schedule immediate, delayed, or periodic work and execute it via a signal-driven executor (no busy waiting).
+![Swift 6.2](https://img.shields.io/badge/Swift-6.2-orange.svg)
+![Platforms](https://img.shields.io/badge/Platforms-iOS%2017+%20|%20macOS%2010.15+-blue.svg)
+![SPM Compatible](https://img.shields.io/badge/SPM-Compatible-green.svg)
 
-You can use it with BackgroundTasks, SwiftUI, server-side Swift, or any Swift concurrency context.
+A lightweight, actor-based task scheduler for Swift. Schedule immediate, delayed, or periodic work and execute it through a signal-driven executor — no busy waiting, no polling.
 
-### Features
+Built on Swift concurrency (actors, async/await, `AsyncStream`) with full `Sendable` conformance. Works with iOS `BackgroundTasks`, macOS `NSBackgroundActivityScheduler`, SwiftUI, server-side Swift, or any async context.
 
-- Immediate, delayed, and periodic scheduling modes.
-- Global actor (`TaskScheduler`) for safe task queuing.
-- Signal-driven execution using `AsyncStream` via `TaskExecutorSignal`.
-- Simple API surface with `ExecutableTask` protocol.
+## Platform Requirements
 
+- iOS 17+
+- macOS 10.15+
+- Swift 6.2+
 
-### Installation
+## Installation
 
-This can be added via Swift Package Manager.
+Add the package to your `Package.swift`:
 
-### Quick Start
+```swift
+dependencies: [
+    .package(url: "https://github.com/molayab/swift-background-scheduler.git", branch: "master")
+]
+```
 
-Define a task:
+Then add `TaskScheduler` as a dependency of your target:
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: ["TaskScheduler"]
+)
+```
+
+## Quick Start
+
+### 1. Define a task
+
+Conform to `ExecutableTask` — a single-method `Sendable` protocol:
 
 ```swift
 import TaskScheduler
@@ -32,128 +51,159 @@ struct PrintTask: ExecutableTask {
 }
 ```
 
-Schedule and run:
+### 2. Schedule and run
 
 ```swift
-import TaskScheduler
-
 let scheduler = TaskScheduler.shared
-
-// Use a timer-backed signal to wake the executor periodically.
 let signal = TaskExecutorSignal.timerTrigger(every: 1.0)
 let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: signal)
 
-// Start the executor.
-    await executor.resume()
+await executor.resume()
 
-// Schedule tasks.
 await scheduler.schedule(task: PrintTask(message: "Hello now"), mode: .immediate)
 await scheduler.schedule(task: PrintTask(message: "Hello in 2s"), mode: .delayed(2))
 await scheduler.schedule(task: PrintTask(message: "Hello every 5s"), mode: .periodic(5))
-
-// Trigger a run immediately (optional if you already have a timer signal).
-signal.trigger()
 ```
 
-### Scheduling Modes
+## Architecture
 
-```swift
-TaskScheduleMode.immediate
-TaskScheduleMode.delayed(2)   // seconds
-TaskScheduleMode.periodic(10) // seconds
+```
+Schedule                    Signal                      Execute
+┌──────────────────┐   ┌──────────────────────┐   ┌──────────────────┐
+│  TaskScheduler   │   │ TaskExecutorSignal   │   │  TaskExecutor    │
+│  (@globalActor)  │◄──│ (AsyncStream<Void>)  │◄──│  (Sendable)      │
+│                  │   │                      │   │                  │
+│ - immediate queue│   │ .manualTrigger()     │   │ .justNext()      │
+│ - delayed queue  │   │ .timerTrigger(every:)│   │ .runContinuously()│
+│ - periodic queue │   │ .customDrivenTrigger()│   │ .resume() / .pause()│
+└──────────────────┘   └──────────────────────┘   └──────────────────┘
 ```
 
-### Triggering Execution Without Busy Waiting
+1. **TaskScheduler** queues tasks into three lists (immediate, delayed, periodic). It is a `@globalActor` — all queue access is serialized.
+2. **TaskExecutorSignal** wraps an `AsyncStream<Void>`. Each `.yield()` wakes the executor. No CPU is consumed while idle.
+3. **TaskExecutor** awaits the signal stream in a `.background`-priority `Task`, calling `scheduler.runNext()` on each signal. When pending tasks remain, it re-triggers itself automatically.
 
-`TaskExecutor` listens to an `AsyncStream` produced by `TaskExecutorSignal`. Whenever you call `signal.trigger()`, the executor wakes and processes the next tasks.
+## Scheduling Modes
 
-Example: trigger on demand (e.g., after scheduling a task):
+| Mode | Description |
+|------|-------------|
+| `.immediate` | Runs on the next executor cycle |
+| `.delayed(TimeInterval)` | Runs once after the specified seconds elapse |
+| `.periodic(TimeInterval)` | Runs repeatedly at the given interval |
 
 ```swift
-let signal = TaskExecutorSignal()
+await scheduler.schedule(task: myTask, mode: .immediate)
+await scheduler.schedule(task: myTask, mode: .delayed(2))
+await scheduler.schedule(task: myTask, mode: .periodic(10))
+```
+
+## Signal Types
+
+### Manual trigger
+
+Fire on demand — useful when you want explicit control over when work runs:
+
+```swift
+let signal = TaskExecutorSignal.manualTrigger()
 let executor = TaskExecutor(taskScheduler: .shared, taskSignal: signal)
+await executor.resume()
 
-Task { await executor.resume() }
-
-await TaskScheduler.shared.schedule(task: PrintTask(message: "Run on trigger"), mode: .immediate)
-signal.trigger()
+await TaskScheduler.shared.schedule(task: myTask, mode: .immediate)
+signal.trigger() // wake the executor
 ```
 
-Example: trigger periodically with a timer:
+### Timer trigger
+
+Wake the executor at a fixed interval:
 
 ```swift
 let signal = TaskExecutorSignal.timerTrigger(every: 0.5)
 let executor = TaskExecutor(taskScheduler: .shared, taskSignal: signal)
-Task { await executor.resume() }
+await executor.resume()
 ```
 
-#### System-Driven Backends
+### Custom backend trigger
 
-`TaskExecutorSignal.systemDrivenTrigger(executor:)` connects the executor to platform backends and also provides a safe fallback timer trigger.
-
-Use case: run work when the system grants background time.
+Connect the executor to a platform-specific or custom backend:
 
 ```swift
-let scheduler = TaskScheduler.shared
-let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: .manualTrigger())
+let executor = TaskExecutor(taskScheduler: .shared, taskSignal: .manualTrigger())
+await executor.resume()
 
-Task { await executor.resume() }
-
-let signal = TaskExecutorSignal.systemDrivenTrigger(executor: executor)
+let signal = TaskExecutorSignal.customDrivenTrigger(
+    usingBackend: myBackend,
+    withExecutor: executor
+)
 ```
 
-**Built-in backends**
+## Platform Backends
 
-- iOS/tvOS/watchOS: `iOSBackend` uses system background scheduling (BackgroundModes) to trigger work.
-- macOS: `MacOSBackend` registers for macOS power-efficient background events.
-- Other platforms: falls back to `executor.runContinuously()`.
+The library ships with built-in backends for Apple platforms:
 
-#### Custom Backend
+- **macOS** — `MacOSBackend` uses `NSBackgroundActivityScheduler` (15-minute repeating interval).
+- **iOS/tvOS/watchOS** — `iOSBackend` integrates with Apple's `BackgroundTasks` framework via a SwiftUI `WindowGroup` modifier (work in progress).
 
-You can plug in your own backend by conforming to `Backend` and registering your executor. Use this when you have an app-specific trigger (push, sockets, file events, etc.).
+## Custom Backends
 
-Example backend that triggers when you call `notify()`:
+Conform to the `Backend` protocol to create your own trigger source (push notifications, WebSockets, file-system events, etc.):
 
 ```swift
-final class ManualBackend: Backend {
-    private var executor: TaskExecutorInterface?
+final class PushBackend: Backend {
+    private var executor: (any TaskExecutorInterface)?
 
-    func register(_ executor: TaskExecutorInterface) {
+    func register(_ executor: any TaskExecutorInterface) {
         self.executor = executor
     }
 
-    func notify() {
-        Task { _ = await executor?.runNext() }
+    func unregister() {
+        executor = nil
+    }
+
+    // Call this when a push arrives
+    func onPushReceived() {
+        Task { try? await executor?.justNext() }
     }
 }
-
-let scheduler = TaskScheduler.shared
-let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: .manualTrigger())
-Task { await executor.resume() }
-
-let backend = ManualBackend()
-
-// Register the backend with the executor
-TaskExecutorSignal.customDrivenTrigger(
-    usingBackend: backend,
-    withExecutor: executor // executor is directly called by your backend.
-)
-
-await scheduler.schedule(task: PrintTask(message: "Custom backend"), mode: .immediate)
-
-// Call your backend to perform next task
-backend.notify()
 ```
 
-### Example App
+Wire it up:
 
-An example app target is included. It demonstrates creating a scheduler and executor, then running tasks.
+```swift
+let scheduler = TaskScheduler.shared
+let executor = TaskExecutor(taskScheduler: scheduler, taskSignal: .manualTrigger())
+await executor.resume()
 
-### Contributing
+let backend = PushBackend()
+TaskExecutorSignal.customDrivenTrigger(
+    usingBackend: backend,
+    withExecutor: executor
+)
 
-Contributions are welcome! Please open issues or pull requests on the GitHub repository.
+await scheduler.schedule(task: myTask, mode: .immediate)
+backend.onPushReceived()
+```
 
-#### Thanks
+## Executor Lifecycle
 
-Thanks to the Swift community for inspiration and ideas on concurrency and task scheduling.
+`TaskExecutor` has three states: **idle**, **running**, and **paused**.
 
+```swift
+let executor = TaskExecutor(taskScheduler: .shared, taskSignal: signal)
+
+// Start continuous execution
+await executor.resume()
+
+// Pause — the executor stops processing after the current task
+await executor.pause()
+
+// Or run a single task on demand without starting the loop
+try await executor.justNext()
+```
+
+## Example App
+
+The repository includes a demo iOS app (`BackgroundApp`) in the parent workspace that shows how to integrate `TaskScheduler` with SwiftUI, SwiftData, and iOS background tasks. See the [workspace README](https://github.com/molayab/swift-molayab-playground) for setup instructions.
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests on the [GitHub repository](https://github.com/molayab/swift-background-scheduler).
