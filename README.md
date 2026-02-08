@@ -67,16 +67,31 @@ await scheduler.schedule(task: PrintTask(message: "Hello every 5s"), mode: .peri
 
 ## Architecture
 
-```
-Schedule                    Signal                      Execute
-┌──────────────────┐   ┌──────────────────────┐   ┌──────────────────┐
-│  TaskScheduler   │   │ TaskExecutorSignal   │   │  TaskExecutor    │
-│  (@globalActor)  │◄──│ (AsyncStream<Void>)  │◄──│  (Sendable)      │
-│                  │   │                      │   │                  │
-│ - immediate queue│   │ .manualTrigger()     │   │ .justNext()      │
-│ - delayed queue  │   │ .timerTrigger(every:)│   │ .runContinuously()│
-│ - periodic queue │   │ .customDrivenTrigger()│   │ .resume() / .pause()│
-└──────────────────┘   └──────────────────────┘   └──────────────────┘
+```mermaid
+flowchart LR
+    subgraph Schedule
+        TS[TaskScheduler<br><i>@globalActor</i>]
+        TS --- Q1[immediate queue]
+        TS --- Q2[delayed queue]
+        TS --- Q3[periodic queue]
+    end
+
+    subgraph Signal
+        TES[TaskExecutorSignal<br><i>AsyncStream&lt;Void&gt;</i>]
+        TES --- S1[.manualTrigger]
+        TES --- S2[.timerTrigger]
+        TES --- S3[.customDrivenTrigger]
+    end
+
+    subgraph Execute
+        TE[TaskExecutor<br><i>Sendable</i>]
+        TE --- E1[.justNext]
+        TE --- E2[.runContinuously]
+        TE --- E3[.resume / .pause]
+    end
+
+    TE -- awaits signal --> TES
+    TES -- wakes executor --> TS
 ```
 
 1. **TaskScheduler** queues tasks into three lists (immediate, delayed, periodic). It is a `@globalActor` — all queue access is serialized.
