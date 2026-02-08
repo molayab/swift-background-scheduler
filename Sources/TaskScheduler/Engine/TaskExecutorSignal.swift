@@ -29,28 +29,6 @@ public final class TaskExecutorSignal: Sendable {
         return signal
     }
     
-    /// Creates a signal that is driven by system events.
-    /// - Parameters:
-    ///   - executor: The task executor to register for system-driven triggers.
-    /// - Returns: A signal that triggers based on system events.
-    public static func systemDrivenTrigger(
-        executor: any TaskExecutorInterface
-    ) -> TaskExecutorSignal {
-        // Fallback timer trigger every 60 seconds
-        let signal = timerTrigger(every: 60)
-        
-        #if os(iOS) || os(tvOS) || os(watchOS)
-        iOSBackend().register(executor)
-        #elseif os(macOS)
-        MacOSBackend().register(executor)
-        #else
-        // Fallback for unsupported platforms
-        executor.runContinuously()
-        #endif
-        
-        return signal
-    }
-    
     /// Creates a signal that is driven by a custom backend.
     /// - Parameters:
     ///   - backend: The backend responsible for triggering the executor.

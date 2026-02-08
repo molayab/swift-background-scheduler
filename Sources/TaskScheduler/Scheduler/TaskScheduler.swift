@@ -24,6 +24,12 @@ public actor TaskScheduler: TaskSchedulerInterface {
     private var delayedTasks: [DelayedTask] = []
     private var periodicTasks: [PeriodicTask] = []
     
+    public func hasPendingTasks() -> Bool {
+        return !executionQueue.isEmpty ||
+        !delayedTasks.isEmpty ||
+        !periodicTasks.isEmpty
+    }
+    
     /// Runs the next scheduled task based on its mode.
     public func runNext() async throws {
         // Execute immediate tasks first

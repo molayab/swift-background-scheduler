@@ -40,7 +40,7 @@ public final class TaskExecutor: Sendable, TaskExecutorInterface {
     
     public init(
         taskScheduler: TaskScheduler,
-        taskSignal: TaskExecutorSignal? = nil
+        taskSignal: TaskExecutorSignal? = .manualTrigger()
     ) {
         self.taskScheduler = taskScheduler
         self.taskSignal = taskSignal
@@ -65,10 +65,17 @@ public final class TaskExecutor: Sendable, TaskExecutorInterface {
         let task = Task(priority: .background) {
             do {
                 guard let taskSignal else { return }
+                await executorState.override(.running)
+                
                 for await _ in taskSignal.stream() {
                     if try await executorState.read() != .running { break }
                     do {
                         try await scheduler.runNext()
+                        
+                        if Task.isCancelled { break }
+                        if await scheduler.hasPendingTasks() {
+                            taskSignal.trigger()
+                        }
                     } catch {
                         print("Error executing task: \(error). Continuing execution.")
                     }
@@ -79,6 +86,8 @@ public final class TaskExecutor: Sendable, TaskExecutorInterface {
                 print("Unexpected error: \(error). Stopping execution.")
             }
         }
+        
+        taskSignal?.trigger()
         return task
     }
     
@@ -101,5 +110,6 @@ public final class TaskExecutor: Sendable, TaskExecutorInterface {
     /// Pauses task execution.
     public func pause() async {
         await state.override(.paused)
+        taskSignal?.trigger()
     }
 }

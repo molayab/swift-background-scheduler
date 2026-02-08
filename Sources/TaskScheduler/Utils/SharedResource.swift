@@ -18,7 +18,7 @@ public actor SharedResource<Resource: Sendable> {
     }
 
     /// Grants serialized access to the underlying resource for in-place mutation.
-    public func access<T>(_ block: (inout Resource?) -> T) -> T {
+    public func access(_ block: (inout Resource?) -> Void) {
         block(&resource)
     }
     
