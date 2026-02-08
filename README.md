@@ -70,21 +70,21 @@ await scheduler.schedule(task: PrintTask(message: "Hello every 5s"), mode: .peri
 ```mermaid
 flowchart LR
     subgraph Schedule
-        TS[TaskScheduler<br><i>@globalActor</i>]
+        TS["TaskScheduler<br><i>@globalActor</i>"]
         TS --- Q1[immediate queue]
         TS --- Q2[delayed queue]
         TS --- Q3[periodic queue]
     end
 
     subgraph Signal
-        TES[TaskExecutorSignal<br><i>AsyncStream&lt;Void&gt;</i>]
+        TES["TaskExecutorSignal<br><i>AsyncStream&lt;Void&gt;</i>"]
         TES --- S1[.manualTrigger]
         TES --- S2[.timerTrigger]
         TES --- S3[.customDrivenTrigger]
     end
 
     subgraph Execute
-        TE[TaskExecutor<br><i>Sendable</i>]
+        TE["TaskExecutor<br><i>Sendable</i>"]
         TE --- E1[.justNext]
         TE --- E2[.runContinuously]
         TE --- E3[.resume / .pause]
